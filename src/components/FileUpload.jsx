@@ -52,8 +52,8 @@ const FileUpload = ({ employees, setEmployees, setCurrentMonth, setCurrentYear, 
         if (jsonData.year) {
           setCurrentYear(jsonData.year);
         }
-        if (jsonData.month !== undefined) {
-          setCurrentMonth(jsonData.month);
+        if (jsonData.month !== undefined && jsonData.month >= 1 && jsonData.month <= 12) {
+          setCurrentMonth(jsonData.month - 1);
         }
 
         // シフト生成状態をリセット
@@ -74,8 +74,8 @@ const FileUpload = ({ employees, setEmployees, setCurrentMonth, setCurrentYear, 
   // 現在のデータをJSONでダウンロード
   const handleDownload = () => {
     const downloadData = {
-      year: new Date().getFullYear(),
-      month: new Date().getMonth(),
+      year: currentYear,        // ← アプリで設定した年
+      month: currentMonth + 1,  // ← アプリで設定した月（1ベースに変換）
       employees: employees.map(emp => ({
         name: emp.name,
         requiredDays: emp.requiredDays,
