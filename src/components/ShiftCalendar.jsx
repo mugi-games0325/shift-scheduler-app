@@ -6,7 +6,8 @@ const ShiftCalendar = ({
   currentMonth, 
   employees, 
   getDaysInMonth, 
-  getDayOfWeek 
+  getDayOfWeek,
+  isWeekendOrHoliday
 }) => {
   const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
   const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
@@ -55,17 +56,19 @@ const ShiftCalendar = ({
           {calendarDays.map((day, index) => {
             const dayOfWeek = index % 7;
             const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+            const isHoliday = day ? isWeekendOrHoliday(currentYear, currentMonth, day) : false;
+            const isRestDay = isWeekend || isHoliday;
             
             return (
               <div 
                 key={index} 
                 className={`min-h-24 p-2 border-r border-b last:border-r-0 ${
-                  !day ? 'bg-gray-50' : isWeekend ? 'bg-blue-50' : 'bg-white'
+                  !day ? 'bg-gray-50' : isRestDay ? 'bg-purple-50' : 'bg-white'
                 }`}
               >
                 {day && (
                   <>
-                    <div className={`font-semibold mb-1 ${isWeekend ? 'text-blue-700' : 'text-gray-800'}`}>
+                    <div className={`font-semibold mb-1 ${isRestDay ? 'text-purple-700' : 'text-gray-800'}`}>
                       {day}
                     </div>
                     <div className="space-y-1">

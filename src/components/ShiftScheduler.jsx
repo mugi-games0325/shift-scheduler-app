@@ -4,6 +4,8 @@ import EmployeeForm from './EmployeeForm';
 import ShiftCalendar from './ShiftCalendar';
 import AttendanceTable from './AttendanceTable';
 import FileUpload from './FileUpload';
+import HolidayStatus from './HolidayStatus';
+import { JapaneseHolidays } from './JapaneseHolidays';
 
 const ShiftScheduler = () => {
   // 初期データは空に変更
@@ -28,6 +30,48 @@ const ShiftScheduler = () => {
 
   // 曜日を取得（0=日曜日）
   const getDayOfWeek = (year, month, day) => new Date(year, month, day).getDay();
+
+  // 土日祝日かどうかを判定
+  const isWeekendOrHoliday = (year, month, day) => {
+    // デバッグ用ログ
+    console.log(`📋 シフト生成での休日判定: ${year}年${month + 1}月${day}日をチェック`);
+
+    // 同期版を使用（パフォーマンス重視）
+    const result = JapaneseHolidays.isWeekendOrHolidaySync(year, month + 1, day);
+
+    console.log(`🔄 判定結果: ${result ? '休業日として扱う' : '平日として扱う'}`);
+    return result;
+  };
+
+  // コンポーネント初期化時に祝日データを取得
+  React.useEffect(() => {
+    const initHolidays = async () => {
+      try {
+        console.log('🚀 シフトスケジューラー: 祝日データ初期化開始');
+        const holidayData = await JapaneseHolidays.getHolidays();
+
+        if (JapaneseHolidays.isUsingFallbackData()) {
+          console.warn('⚠️ 祝日APIが利用できないため、ハードコーディングデータを使用しています');
+        } else {
+          console.log('✅ 祝日APIデータを正常に取得しました');
+        }
+
+        // テスト用：2025年8月11日（山の日）をチェック
+        console.log('🧪 テスト: 2025年8月11日の判定');
+        const testResult = await JapaneseHolidays.isHoliday(2025, 8, 11);
+        console.log(`🏔️ 2025年8月11日は祝日か?: ${testResult}`);
+
+        // シフト生成で使用される関数もテスト
+        console.log('🧪 テスト: シフト生成関数での判定');
+        const shiftTestResult = isWeekendOrHoliday(2025, 7, 11); // month は 0-indexed
+        console.log(`🔄 シフト関数での2025年8月11日判定: ${shiftTestResult}`);
+
+      } catch (error) {
+        console.error('祝日データの初期化に失敗しました:', error);
+      }
+    };
+    initHolidays();
+  }, []);
 
   // シフト自動生成（改良版 - 6連勤回避機能付き）
   const generateSchedule = useCallback(() => {
@@ -62,10 +106,10 @@ const ShiftScheduler = () => {
     // フェーズ1: 基本的なシフト割り当て（必要人数確保）
     for (let day = 1; day <= daysInMonth; day++) {
       const dayOfWeek = getDayOfWeek(currentYear, currentMonth, day);
-      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-      const idealStaff = isWeekend ? 2 : 5;  // 理想的な人数
-      const minRequiredStaff = isWeekend ? 2 : 4;  // 最低限必要な人数
-      const maxStaff = isWeekend ? 3 : Infinity;
+      const isRestDay = isWeekendOrHoliday(currentYear, currentMonth, day);
+      const idealStaff = isRestDay ? 2 : 5;  // 理想的な人数
+      const minRequiredStaff = isRestDay ? 2 : 4;  // 最低限必要な人数
+      const maxStaff = isRestDay ? 3 : Infinity;
 
       // 利用可能な従業員をフィルタ
       let availableEmployees = validEmployees.filter(emp => {
@@ -79,10 +123,10 @@ const ShiftScheduler = () => {
         // 6連勤に近い人は優先度を下げる
         const aConsecutive = consecutiveDays[a.id];
         const bConsecutive = consecutiveDays[b.id];
-        
+
         if (aConsecutive >= 6 && bConsecutive < 6) return 1;
         if (aConsecutive < 6 && bConsecutive >= 6) return -1;
-        
+
         // 通常の優先度計算
         const aProgress = workDaysCount[a.id] / Math.max(a.requiredDays, 1);
         const bProgress = workDaysCount[b.id] / Math.max(b.requiredDays, 1);
@@ -100,7 +144,7 @@ const ShiftScheduler = () => {
       }
 
       // 平日で理想人数に満たない場合の処理
-      if (!isWeekend) {
+      if (!isRestDay) {
         if (assignedCount < idealStaff && assignedCount >= minRequiredStaff) {
           console.warn(`${currentYear}年${currentMonth + 1}月${day}日（平日）: 推奨${idealStaff}人に対し${assignedCount}人のみ配置`);
         } else if (assignedCount < minRequiredStaff) {
@@ -109,7 +153,7 @@ const ShiftScheduler = () => {
       }
 
       // 平日で人数に余裕がある場合、追加でアサイン
-      if (!isWeekend && assignedCount < availableEmployees.length) {
+      if (!isRestDay && assignedCount < availableEmployees.length) {
         const remainingEmployees = availableEmployees.slice(assignedCount);
 
         // まだ勤務日数が足りない従業員を優先
@@ -121,10 +165,10 @@ const ShiftScheduler = () => {
         needMoreWork.sort((a, b) => {
           const aConsecutive = consecutiveDays[a.id];
           const bConsecutive = consecutiveDays[b.id];
-          
+
           if (aConsecutive >= 6 && bConsecutive < 6) return 1;
           if (aConsecutive < 6 && bConsecutive >= 6) return -1;
-          
+
           const aProgress = workDaysCount[a.id] / Math.max(a.requiredDays, 1);
           const bProgress = workDaysCount[b.id] / Math.max(b.requiredDays, 1);
           return aProgress - bProgress;
@@ -217,7 +261,7 @@ const ShiftScheduler = () => {
               if (otherDay === day) continue;
               if (newSchedule[otherDay].includes(emp.id)) continue;
               if (emp.unavailableDays.includes(otherDay)) continue;
-              
+
               // この日の連続勤務日数をチェック
               let otherConsecutive = 0;
               for (let cd = otherDay - 6; cd <= otherDay + 6; cd++) {
@@ -230,18 +274,18 @@ const ShiftScheduler = () => {
                   otherConsecutive = 0;
                 }
               }
-              
+
               if (otherConsecutive < 6) {
                 const dayOfWeek2 = getDayOfWeek(currentYear, currentMonth, otherDay);
-                const isWeekend2 = dayOfWeek2 === 0 || dayOfWeek2 === 6;
-                const maxAllowed2 = isWeekend2 ? 3 : Infinity;
-                
+                const isRestDay2 = isWeekendOrHoliday(currentYear, currentMonth, otherDay);
+                const maxAllowed2 = isRestDay2 ? 3 : Infinity;
+
                 if (newSchedule[otherDay].length < maxAllowed2) {
                   otherOptions.push(otherDay);
                 }
               }
             }
-            
+
             if (otherOptions.length > 0) {
               canWork = false; // 他の選択肢があるので6連勤は避ける
             }
@@ -250,15 +294,15 @@ const ShiftScheduler = () => {
           if (!canWork) continue;
 
           const dayOfWeek = getDayOfWeek(currentYear, currentMonth, day);
-          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+          const isRestDay = isWeekendOrHoliday(currentYear, currentMonth, day);
           const currentStaff = newSchedule[day].length;
-          const maxAllowed = isWeekend ? 3 : Infinity;
+          const maxAllowed = isRestDay ? 3 : Infinity;
 
-          // 土日は最大3人、平日は制限なし
+          // 土日祝日は最大3人、平日は制限なし
           if (currentStaff < maxAllowed) {
             // 連続勤務日数が少ない日を優先、同じなら人数の少ない日を優先
-            if (consecutive < bestDayConsecutive || 
-                (consecutive === bestDayConsecutive && currentStaff < minCurrentStaff)) {
+            if (consecutive < bestDayConsecutive ||
+              (consecutive === bestDayConsecutive && currentStaff < minCurrentStaff)) {
               minCurrentStaff = currentStaff;
               bestDayConsecutive = consecutive;
               bestDay = day;
@@ -286,14 +330,14 @@ const ShiftScheduler = () => {
           if (!newSchedule[day].includes(emp.id)) continue;
 
           const dayOfWeek = getDayOfWeek(currentYear, currentMonth, day);
-          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-          const idealRequired = isWeekend ? 2 : 5;  // 理想的な人数
-          const minRequired = isWeekend ? 2 : 4;    // 最低限必要な人数
+          const isRestDay = isWeekendOrHoliday(currentYear, currentMonth, day);
+          const idealRequired = isRestDay ? 2 : 5;  // 理想的な人数
+          const minRequired = isRestDay ? 2 : 4;    // 最低限必要な人数
           const currentStaff = newSchedule[day].length;
 
           // 削除可能な条件：理想人数を下回らない、または最低人数を下回らない
-          if (currentStaff > idealRequired || 
-              (!isWeekend && currentStaff > minRequired && currentStaff <= idealRequired)) {
+          if (currentStaff > idealRequired ||
+            (!isRestDay && currentStaff > minRequired && currentStaff <= idealRequired)) {
             // より人数の多い日を優先して削除
             if (currentStaff > maxCurrentStaff) {
               maxCurrentStaff = currentStaff;
@@ -322,6 +366,9 @@ const ShiftScheduler = () => {
           <Calendar className="text-blue-600" size={28} />
           <h1 className="text-2xl font-bold text-gray-800">シフト表自動作成アプリ</h1>
         </div>
+
+        {/* 祝日データステータス */}
+        <HolidayStatus />
 
         {/* データ管理エリア */}
         <FileUpload
@@ -392,6 +439,7 @@ const ShiftScheduler = () => {
           currentMonth={currentMonth}
           getDaysInMonth={getDaysInMonth}
           getDayOfWeek={getDayOfWeek}
+          isWeekendOrHoliday={isWeekendOrHoliday}
         />
 
         {/* シフト生成ボタン */}
@@ -415,6 +463,7 @@ const ShiftScheduler = () => {
               employees={employees}
               getDaysInMonth={getDaysInMonth}
               getDayOfWeek={getDayOfWeek}
+              isWeekendOrHoliday={isWeekendOrHoliday}
             />
 
             {/* メンバー別勤怠表 */}
@@ -425,6 +474,7 @@ const ShiftScheduler = () => {
               currentMonth={currentMonth}
               getDaysInMonth={getDaysInMonth}
               getDayOfWeek={getDayOfWeek}
+              isWeekendOrHoliday={isWeekendOrHoliday}
             />
           </div>
         )}

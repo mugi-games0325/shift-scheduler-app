@@ -1,12 +1,13 @@
 import React from 'react';
 
-const AttendanceTable = ({
-  schedule,
-  employees,
-  currentYear,
-  currentMonth,
-  getDaysInMonth,
-  getDayOfWeek
+const AttendanceTable = ({ 
+  schedule, 
+  employees, 
+  currentYear, 
+  currentMonth, 
+  getDaysInMonth, 
+  getDayOfWeek,
+  isWeekendOrHoliday
 }) => {
   return (
     <div>
@@ -19,8 +20,10 @@ const AttendanceTable = ({
               {Array.from({ length: getDaysInMonth(currentYear, currentMonth) }, (_, i) => i + 1).map(day => {
                 const dayOfWeek = getDayOfWeek(currentYear, currentMonth, day);
                 const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                const isHoliday = isWeekendOrHoliday(currentYear, currentMonth, day);
+                const isRestDay = isWeekend || isHoliday;
                 return (
-                  <th key={day} className={`p-2 text-center border-r text-xs ${isWeekend ? 'bg-blue-50' : ''}`}>
+                  <th key={day} className={`p-2 text-center border-r text-xs ${isRestDay ? 'bg-purple-50' : ''}`}>
                     {day}
                   </th>
                 );
@@ -30,21 +33,23 @@ const AttendanceTable = ({
           </thead>
           <tbody>
             {employees.filter(emp => emp.name.trim() !== '').map(employee => {
-              const totalDays = Object.values(schedule).filter(daySchedule =>
+              const totalDays = Object.values(schedule).filter(daySchedule => 
                 daySchedule.includes(employee.id)
               ).length;
-
+              
               return (
                 <tr key={employee.id} className="border-b">
                   <td className="p-3 font-medium border-r">{employee.name}</td>
                   {Array.from({ length: getDaysInMonth(currentYear, currentMonth) }, (_, i) => i + 1).map(day => {
                     const dayOfWeek = getDayOfWeek(currentYear, currentMonth, day);
                     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                    const isHoliday = isWeekendOrHoliday(currentYear, currentMonth, day);
+                    const isRestDay = isWeekend || isHoliday;
                     const isWorking = schedule[day]?.includes(employee.id);
                     const isUnavailable = employee.unavailableDays.includes(day);
-
+                    
                     return (
-                      <td key={day} className={`p-2 text-center border-r text-xs ${isWeekend ? 'bg-blue-50' : ''}`}>
+                      <td key={day} className={`p-2 text-center border-r text-xs ${isRestDay ? 'bg-purple-50' : ''}`}>
                         {isUnavailable ? (
                           <span className="text-red-500">✕</span>
                         ) : isWorking ? (

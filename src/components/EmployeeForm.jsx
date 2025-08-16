@@ -1,13 +1,14 @@
 import React from 'react';
 import { Users, Plus, Trash2 } from 'lucide-react';
 
-const EmployeeForm = ({
-  employees,
-  setEmployees,
-  currentYear,
-  currentMonth,
-  getDaysInMonth,
-  getDayOfWeek
+const EmployeeForm = ({ 
+  employees, 
+  setEmployees, 
+  currentYear, 
+  currentMonth, 
+  getDaysInMonth, 
+  getDayOfWeek,
+  isWeekendOrHoliday
 }) => {
   const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -28,7 +29,7 @@ const EmployeeForm = ({
 
   // 従業員情報更新
   const updateEmployee = (id, field, value) => {
-    setEmployees(employees.map(emp =>
+    setEmployees(employees.map(emp => 
       emp.id === id ? { ...emp, [field]: value } : emp
     ));
   };
@@ -88,7 +89,7 @@ const EmployeeForm = ({
                 <Trash2 size={16} />
               </button>
             </div>
-
+            
             <div>
               <p className="text-sm font-medium mb-2">働けない日:</p>
               <div className="space-y-1">
@@ -100,41 +101,41 @@ const EmployeeForm = ({
                     </div>
                   ))}
                 </div>
-
+                
                 {/* 日付グリッド（7日ごとに改行） */}
                 {(() => {
                   const daysInMonth = getDaysInMonth(currentYear, currentMonth);
                   const firstDayOfWeek = getDayOfWeek(currentYear, currentMonth, 1);
                   const weeks = [];
                   let currentWeek = [];
-
+                  
                   // 最初の週の空白日を追加
                   for (let i = 0; i < firstDayOfWeek; i++) {
                     currentWeek.push(null);
                   }
-
+                  
                   // 日付を追加
                   for (let day = 1; day <= daysInMonth; day++) {
                     currentWeek.push(day);
-
+                    
                     // 週が完成したら次の週へ
                     if (currentWeek.length === 7) {
                       weeks.push(currentWeek);
                       currentWeek = [];
                     }
                   }
-
+                  
                   // 最後の週が未完成の場合は追加
                   if (currentWeek.length > 0) {
                     weeks.push(currentWeek);
                   }
-
+                  
                   return weeks.map((week, weekIndex) => (
                     <div key={weekIndex} className="grid grid-cols-7 gap-1">
                       {week.map((day, dayIndex) => {
                         const dayOfWeek = dayIndex;
                         const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-
+                        
                         return (
                           <div key={dayIndex} className="aspect-square">
                             {day ? (
