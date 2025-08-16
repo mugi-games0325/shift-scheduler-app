@@ -1,12 +1,12 @@
 import React from 'react';
 
-const ShiftCalendar = ({
-  schedule,
-  currentYear,
-  currentMonth,
-  employees,
-  getDaysInMonth,
-  getDayOfWeek
+const ShiftCalendar = ({ 
+  schedule, 
+  currentYear, 
+  currentMonth, 
+  employees, 
+  getDaysInMonth, 
+  getDayOfWeek 
 }) => {
   const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
   const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
@@ -55,10 +55,10 @@ const ShiftCalendar = ({
           {calendarDays.map((day, index) => {
             const dayOfWeek = index % 7;
             const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-
+            
             return (
-              <div
-                key={index}
+              <div 
+                key={index} 
                 className={`min-h-24 p-2 border-r border-b last:border-r-0 ${
                   !day ? 'bg-gray-50' : isWeekend ? 'bg-blue-50' : 'bg-white'
                 }`}
@@ -69,11 +69,13 @@ const ShiftCalendar = ({
                       {day}
                     </div>
                     <div className="space-y-1">
-                      {schedule[day]?.map(empId => (
-                        <div key={empId} className="text-xs bg-yellow-200 px-1 py-0.5 rounded">
-                          {getEmployeeName(empId)}
-                        </div>
-                      ))}
+                      {schedule[day]
+                        ?.sort((a, b) => a - b)
+                        ?.map(empId => (
+                          <div key={empId} className="text-xs bg-yellow-200 px-1 py-0.5 rounded">
+                            {getEmployeeName(empId)}
+                          </div>
+                        ))}
                     </div>
                   </>
                 )}
