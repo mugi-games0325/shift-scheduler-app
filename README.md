@@ -32,6 +32,7 @@ If you are developing a production application, we recommend using TypeScript wi
 ### 個人制約
 - **働けない日**: 従業員指定日は勤務対象外
 - **連続勤務**: 7日以上連続勤務禁止
+- **6連勤回避**: 可能な限り6日連続勤務を避ける（他に選択肢がある場合）
 - **必要勤務日数**: 各従業員の設定日数を必ず達成
 
 ## シフト作成の流れ

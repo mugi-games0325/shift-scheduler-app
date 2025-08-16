@@ -29,7 +29,7 @@ const ShiftScheduler = () => {
   // 曜日を取得（0=日曜日）
   const getDayOfWeek = (year, month, day) => new Date(year, month, day).getDay();
 
-  // シフト自動生成（改良版）
+  // シフト自動生成（改良版 - 6連勤回避機能付き）
   const generateSchedule = useCallback(() => {
     const daysInMonth = getDaysInMonth(currentYear, currentMonth);
     const newSchedule = {};
@@ -73,8 +73,16 @@ const ShiftScheduler = () => {
         return true;
       });
 
-      // 必要勤務日数の達成度が低い順にソート
+      // 6連勤回避を考慮した優先順位付け
       availableEmployees.sort((a, b) => {
+        // 6連勤に近い人は優先度を下げる
+        const aConsecutive = consecutiveDays[a.id];
+        const bConsecutive = consecutiveDays[b.id];
+
+        if (aConsecutive >= 6 && bConsecutive < 6) return 1;
+        if (aConsecutive < 6 && bConsecutive >= 6) return -1;
+
+        // 通常の優先度計算
         const aProgress = workDaysCount[a.id] / Math.max(a.requiredDays, 1);
         const bProgress = workDaysCount[b.id] / Math.max(b.requiredDays, 1);
         return aProgress - bProgress;
@@ -99,8 +107,14 @@ const ShiftScheduler = () => {
           workDaysCount[emp.id] < emp.requiredDays
         );
 
-        // 必要勤務日数の達成度が低い順にソート
+        // 6連勤回避を考慮した優先順位付け
         needMoreWork.sort((a, b) => {
+          const aConsecutive = consecutiveDays[a.id];
+          const bConsecutive = consecutiveDays[b.id];
+
+          if (aConsecutive >= 6 && bConsecutive < 6) return 1;
+          if (aConsecutive < 6 && bConsecutive >= 6) return -1;
+
           const aProgress = workDaysCount[a.id] / Math.max(a.requiredDays, 1);
           const bProgress = workDaysCount[b.id] / Math.max(b.requiredDays, 1);
           return aProgress - bProgress;
@@ -136,6 +150,7 @@ const ShiftScheduler = () => {
       while (currentWorkDays < targetDays) {
         let bestDay = null;
         let minCurrentStaff = Infinity;
+        let bestDayConsecutive = Infinity;
 
         // 追加可能な日を探す
         for (let day = 1; day <= daysInMonth; day++) {
@@ -169,6 +184,44 @@ const ShiftScheduler = () => {
             }
           }
 
+          // 6連勤チェックを追加
+          if (canWork && consecutive >= 6) {
+            // 6連勤になる場合は、他に選択肢がない場合のみ許可
+            const otherOptions = [];
+            for (let otherDay = 1; otherDay <= daysInMonth; otherDay++) {
+              if (otherDay === day) continue;
+              if (newSchedule[otherDay].includes(emp.id)) continue;
+              if (emp.unavailableDays.includes(otherDay)) continue;
+
+              // この日の連続勤務日数をチェック
+              let otherConsecutive = 0;
+              for (let cd = otherDay - 6; cd <= otherDay + 6; cd++) {
+                if (cd < 1 || cd > daysInMonth) continue;
+                if (cd === otherDay) {
+                  otherConsecutive++;
+                } else if (newSchedule[cd] && newSchedule[cd].includes(emp.id)) {
+                  otherConsecutive++;
+                } else {
+                  otherConsecutive = 0;
+                }
+              }
+
+              if (otherConsecutive < 6) {
+                const dayOfWeek2 = getDayOfWeek(currentYear, currentMonth, otherDay);
+                const isWeekend2 = dayOfWeek2 === 0 || dayOfWeek2 === 6;
+                const maxAllowed2 = isWeekend2 ? 3 : Infinity;
+
+                if (newSchedule[otherDay].length < maxAllowed2) {
+                  otherOptions.push(otherDay);
+                }
+              }
+            }
+
+            if (otherOptions.length > 0) {
+              canWork = false; // 他の選択肢があるので6連勤は避ける
+            }
+          }
+
           if (!canWork) continue;
 
           const dayOfWeek = getDayOfWeek(currentYear, currentMonth, day);
@@ -178,9 +231,11 @@ const ShiftScheduler = () => {
 
           // 土日は最大3人、平日は制限なし
           if (currentStaff < maxAllowed) {
-            // より人数の少ない日を優先
-            if (currentStaff < minCurrentStaff) {
+            // 連続勤務日数が少ない日を優先、同じなら人数の少ない日を優先
+            if (consecutive < bestDayConsecutive ||
+              (consecutive === bestDayConsecutive && currentStaff < minCurrentStaff)) {
               minCurrentStaff = currentStaff;
+              bestDayConsecutive = consecutive;
               bestDay = day;
             }
           }
