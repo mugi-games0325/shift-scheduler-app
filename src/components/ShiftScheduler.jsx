@@ -24,7 +24,7 @@ const ShiftScheduler = () => {
   const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 
   // 月の日数を取得
-  const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
+  const getDaysInMonth = (year, month) => new Date(year, month, 0).getDate();
 
   // 曜日を取得（0=日曜日）
   const getDayOfWeek = (year, month, day) => new Date(year, month, day).getDay();
