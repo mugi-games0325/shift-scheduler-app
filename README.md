@@ -26,7 +26,7 @@ If you are developing a production application, we recommend using TypeScript wi
 ## 基本ルール
 
 ### 人数制限
-- **平日（月〜金）**: 最低4人以上、上限なし
+- **平日（月〜金）**: 最低5人推奨、4人まで許容、上限なし
 - **土日（土・日）**: 最低2人、最大3人
 
 ### 個人制約

@@ -63,7 +63,8 @@ const ShiftScheduler = () => {
     for (let day = 1; day <= daysInMonth; day++) {
       const dayOfWeek = getDayOfWeek(currentYear, currentMonth, day);
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-      const minRequiredStaff = isWeekend ? 2 : 4;
+      const idealStaff = isWeekend ? 2 : 5;  // 理想的な人数
+      const minRequiredStaff = isWeekend ? 2 : 4;  // 最低限必要な人数
       const maxStaff = isWeekend ? 3 : Infinity;
 
       // 利用可能な従業員をフィルタ
@@ -78,24 +79,33 @@ const ShiftScheduler = () => {
         // 6連勤に近い人は優先度を下げる
         const aConsecutive = consecutiveDays[a.id];
         const bConsecutive = consecutiveDays[b.id];
-
+        
         if (aConsecutive >= 6 && bConsecutive < 6) return 1;
         if (aConsecutive < 6 && bConsecutive >= 6) return -1;
-
+        
         // 通常の優先度計算
         const aProgress = workDaysCount[a.id] / Math.max(a.requiredDays, 1);
         const bProgress = workDaysCount[b.id] / Math.max(b.requiredDays, 1);
         return aProgress - bProgress;
       });
 
-      // 最低必要人数を確保
+      // まず理想的な人数を目指す
       let assignedCount = 0;
       for (const emp of availableEmployees) {
-        if (assignedCount >= Math.min(minRequiredStaff, maxStaff)) break;
+        if (assignedCount >= Math.min(idealStaff, maxStaff)) break;
 
         newSchedule[day].push(emp.id);
         workDaysCount[emp.id]++;
         assignedCount++;
+      }
+
+      // 平日で理想人数に満たない場合の処理
+      if (!isWeekend) {
+        if (assignedCount < idealStaff && assignedCount >= minRequiredStaff) {
+          console.warn(`${currentYear}年${currentMonth + 1}月${day}日（平日）: 推奨${idealStaff}人に対し${assignedCount}人のみ配置`);
+        } else if (assignedCount < minRequiredStaff) {
+          console.error(`${currentYear}年${currentMonth + 1}月${day}日（平日）: 最低必要${minRequiredStaff}人に対し${assignedCount}人のみ配置`);
+        }
       }
 
       // 平日で人数に余裕がある場合、追加でアサイン
@@ -111,22 +121,37 @@ const ShiftScheduler = () => {
         needMoreWork.sort((a, b) => {
           const aConsecutive = consecutiveDays[a.id];
           const bConsecutive = consecutiveDays[b.id];
-
+          
           if (aConsecutive >= 6 && bConsecutive < 6) return 1;
           if (aConsecutive < 6 && bConsecutive >= 6) return -1;
-
+          
           const aProgress = workDaysCount[a.id] / Math.max(a.requiredDays, 1);
           const bProgress = workDaysCount[b.id] / Math.max(b.requiredDays, 1);
           return aProgress - bProgress;
         });
 
-        // 平日は最大6人まで追加可能
+        // まず理想人数まで追加
+        if (assignedCount < idealStaff) {
+          const toIdeal = Math.min(needMoreWork.length, idealStaff - assignedCount);
+          for (let i = 0; i < toIdeal; i++) {
+            const emp = needMoreWork[i];
+            if (!newSchedule[day].includes(emp.id)) {
+              newSchedule[day].push(emp.id);
+              workDaysCount[emp.id]++;
+              assignedCount++;
+            }
+          }
+        }
+
+        // さらに必要に応じて6人まで追加可能
         const maxAdditional = Math.min(needMoreWork.length, 6 - assignedCount);
-        for (let i = 0; i < maxAdditional; i++) {
-          const emp = needMoreWork[i];
-          if (!newSchedule[day].includes(emp.id)) {
-            newSchedule[day].push(emp.id);
-            workDaysCount[emp.id]++;
+        for (let i = idealStaff - (assignedCount - (idealStaff - assignedCount)); i < maxAdditional; i++) {
+          if (i >= 0 && i < needMoreWork.length) {
+            const emp = needMoreWork[i];
+            if (!newSchedule[day].includes(emp.id)) {
+              newSchedule[day].push(emp.id);
+              workDaysCount[emp.id]++;
+            }
           }
         }
       }
@@ -192,7 +217,7 @@ const ShiftScheduler = () => {
               if (otherDay === day) continue;
               if (newSchedule[otherDay].includes(emp.id)) continue;
               if (emp.unavailableDays.includes(otherDay)) continue;
-
+              
               // この日の連続勤務日数をチェック
               let otherConsecutive = 0;
               for (let cd = otherDay - 6; cd <= otherDay + 6; cd++) {
@@ -205,18 +230,18 @@ const ShiftScheduler = () => {
                   otherConsecutive = 0;
                 }
               }
-
+              
               if (otherConsecutive < 6) {
                 const dayOfWeek2 = getDayOfWeek(currentYear, currentMonth, otherDay);
                 const isWeekend2 = dayOfWeek2 === 0 || dayOfWeek2 === 6;
                 const maxAllowed2 = isWeekend2 ? 3 : Infinity;
-
+                
                 if (newSchedule[otherDay].length < maxAllowed2) {
                   otherOptions.push(otherDay);
                 }
               }
             }
-
+            
             if (otherOptions.length > 0) {
               canWork = false; // 他の選択肢があるので6連勤は避ける
             }
@@ -232,8 +257,8 @@ const ShiftScheduler = () => {
           // 土日は最大3人、平日は制限なし
           if (currentStaff < maxAllowed) {
             // 連続勤務日数が少ない日を優先、同じなら人数の少ない日を優先
-            if (consecutive < bestDayConsecutive ||
-              (consecutive === bestDayConsecutive && currentStaff < minCurrentStaff)) {
+            if (consecutive < bestDayConsecutive || 
+                (consecutive === bestDayConsecutive && currentStaff < minCurrentStaff)) {
               minCurrentStaff = currentStaff;
               bestDayConsecutive = consecutive;
               bestDay = day;
@@ -262,11 +287,13 @@ const ShiftScheduler = () => {
 
           const dayOfWeek = getDayOfWeek(currentYear, currentMonth, day);
           const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-          const minRequired = isWeekend ? 2 : 4;
+          const idealRequired = isWeekend ? 2 : 5;  // 理想的な人数
+          const minRequired = isWeekend ? 2 : 4;    // 最低限必要な人数
           const currentStaff = newSchedule[day].length;
 
-          // 最低必要人数を下回らない場合のみ削除可能
-          if (currentStaff > minRequired) {
+          // 削除可能な条件：理想人数を下回らない、または最低人数を下回らない
+          if (currentStaff > idealRequired || 
+              (!isWeekend && currentStaff > minRequired && currentStaff <= idealRequired)) {
             // より人数の多い日を優先して削除
             if (currentStaff > maxCurrentStaff) {
               maxCurrentStaff = currentStaff;
